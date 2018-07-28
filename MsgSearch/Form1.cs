@@ -14,8 +14,8 @@ namespace MsgSearch
 {
 	public partial class Form1 : Form
 	{
-		private Manager _mgr;
-		private string _file;
+		private Manager _mgr = new Manager();
+        private string _file;
 
 		public Form1()
 		{
@@ -35,7 +35,8 @@ namespace MsgSearch
 
 		private void btnSearch_Click(object sender, EventArgs e)
 		{
-			var messages = _mgr?.Search(txtQuery.Text);
+            tree.Nodes.Clear();
+            var messages = _mgr?.Search(txtQuery.Text, txtFrom.Text, int.Parse(txtLimit.Text), int.Parse(txtSkip.Text));
 			foreach (var message in messages)
 			{
 				var node = new TreeNode();
@@ -81,24 +82,35 @@ namespace MsgSearch
 		private void drag_DragDrop(object sender, DragEventArgs e)
 		{
 			string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-			foreach (string file in files)
-			{
-				if (Path.GetExtension(file) == ".html" | Path.GetExtension(file) == ".htm")
-				{
-					btnSearch.Enabled = false;
-					picLoading.Visible = true;
-					lblDrag.Visible = false;
-					_file = file;
-					bw.RunWorkerAsync();
-				}					
-
-				break;
-			}
+            LoadFiles(files);
 		}
+
+        private async void LoadFiles(string[] files)
+        {
+            btnSearch.Enabled = false;
+            picLoading.Visible = true;
+            lblDrag.Visible = false;
+
+            await Task.Run(() => 
+            {
+                foreach(var file in files)
+                {
+                    if (Path.GetExtension(file) == ".html" | Path.GetExtension(file) == ".htm")
+                    {
+                        _mgr.AddFile(file);
+                    }
+                }
+            });
+
+            btnSearch.Enabled = true;
+            picLoading.Visible = false;
+            lblDrag.Visible = true;
+            lblDrag.Text = "Initialized";
+        }
 
 		private void bw_DoWork(object sender, DoWorkEventArgs e)
 		{
-			_mgr = new Manager(_file);
+            
 		}
 
 		private void copyTestToolStripMenuItem_Click(object sender, EventArgs e)
@@ -116,5 +128,11 @@ namespace MsgSearch
 			lblDrag.Visible = true;
 			lblDrag.Text = "Initialized";
 		}
-	}
+
+        private void btnClear_Click(object sender, EventArgs e)
+        {
+            _mgr = new Manager();
+            tree.Nodes.Clear();
+        }
+    }
 }

@@ -1,8 +1,10 @@
 ﻿using HtmlAgilityPack;
+using LinqKit;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -17,27 +19,31 @@ namespace MsgSearchLib
 		public List<MsgThread> Threads { get; set; }
 
 
-		public Manager(string pathToMessagesHtml)
+		public Manager()
 		{
-			if (File.Exists(pathToMessagesHtml))
-			{
-				MessagesDocument = new HtmlDocument();
-				Threads = new List<MsgThread>();
-				MessagesDocument.Load(pathToMessagesHtml, Encoding.UTF8, true);
-				Init();
-			}
-			else
-				throw new Exception("Cannot find messages html file.");
-		}
+            MessagesDocument = new HtmlDocument();
+            Threads = new List<MsgThread>();
+        }
 
-		private void Init()
+        public void AddFile(string pathToMessagesHtml)
+        {
+            if (File.Exists(pathToMessagesHtml))
+            {
+                MessagesDocument.Load(pathToMessagesHtml, Encoding.UTF8, true);
+                Init(Path.GetFileName(pathToMessagesHtml));
+            }
+            else
+                throw new Exception("Cannot find messages html file.");
+        }
+
+		private void Init(string fileName)
 		{
 			var threads = MessagesDocument.DocumentNode.SelectNodes("//*[@class='thread']");
 
 			foreach(var thread in threads)
 			{
 				LinkedList<Message> messages = new LinkedList<Message>();
-				var msgThread = new MsgThread();
+				var msgThread = new MsgThread(thread.SelectSingleNode("./h3").InnerText, fileName);
 
 				var messageNodes = thread.SelectNodes("./div[@class='message']");
 				foreach(var message in messageNodes.Reverse())
@@ -54,12 +60,37 @@ namespace MsgSearchLib
 			}
 		}
 
-		public List<Message> Search(string text)
+		public List<Message> Search(string text, string from = null, int limit = 1000, int skip = 0)
 		{
-			List<Message> results = new List<Message>();
+            Expression<Func<Message, bool>> fromEx = PredicateBuilder.New<Message>(true);
+            if (!string.IsNullOrEmpty(from))
+            {
+                if (from.Contains("|"))
+                {
+                    var froms = from.Split('|');
+
+                    foreach (var f in froms)
+                    {
+                        Expression<Func<Message, bool>> ex = m => m.From.Contains(f);
+                        fromEx = fromEx.Or(ex);
+                    }
+                }
+                else
+                {
+                    fromEx = m => m.From.Contains(from);
+                }
+            }
+                
+            List<Message> results = new List<Message>();
 			foreach(var thread in Threads)
 			{
-				results.AddRange(thread.Messages.Where(m => m.Text.Contains(text)));
+                var messages = thread.Messages
+                    .Where(m => m.Text.Contains(text))
+                    .Where(fromEx.Compile())
+                    .Skip(skip)
+                    .Take(limit);
+
+                results.AddRange(messages);
 			}
 
 			return results;

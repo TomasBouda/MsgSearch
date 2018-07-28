@@ -8,16 +8,25 @@ namespace MsgSearchLib
 {
 	public class MsgThread
 	{
-		public LinkedList<Message> Messages { get; set; }
+        public string Name { get; set; }
+        public string FileName { get; set; }
 
-		public MsgThread()
+        public LinkedList<Message> Messages { get; set; }
+
+		public MsgThread(string name, string fileName)
 		{
-
-		}
+            Name = name;
+            FileName = fileName;
+        }
 
 		public MsgThread(LinkedList<Message> messages)
 		{
 			Messages = messages;
 		}
-	}
+
+        public override string ToString()
+        {
+            return $"{FileName} - {Name}";
+        }
+    }
 }
